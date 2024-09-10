@@ -6,21 +6,26 @@ namespace KHN.Cons.Entities
 {
     public class Block : BaseEntity
     {
-        public Block(int blockNumber, Transaction transaction, string? parentHash = null, int dificulty = 0)
+        public Block(int blockNumber, int dificulty = 0, string? parentHash = null)
         {
             Dificulty = dificulty;
             ParentHash = parentHash;
-            Transaction = transaction;
             BlockNumber = blockNumber;
+            _transactions = new List<Transaction>();
         }
 
 
         public int BlockNumber { get; }
         public string? ParentHash { get; }
-        public Transaction Transaction { get; }
         public string? MixHash { get; protected set; }
         public DateTime? Timestamp { get; protected set; }
 
+        private readonly List<Transaction> _transactions;
+        public IReadOnlyList<Transaction> Transactions { get
+            {
+                return _transactions;
+            }
+        }
 
 
         public int Dificulty { get; }
@@ -28,10 +33,26 @@ namespace KHN.Cons.Entities
         public TimeSpan? Duration { get; protected set; }
 
 
+        public void AddTransaction(Transaction transaction)
+        {
+            _transactions.Add(transaction);
+        }
+
+        public bool IsMined()
+        {
+            if (string.IsNullOrEmpty(MixHash))
+            {
+                return false;
+            }
+            else
+            {
+                return true;
+            }
+        }
 
         public void Mine()
         {
-            if (string.IsNullOrWhiteSpace(MixHash) == false)
+            if (IsMined())
             {
                 return;
             }
@@ -39,7 +60,7 @@ namespace KHN.Cons.Entities
 
             Timestamp = Utility.Now;
 
-            var leadingZeros = string.Empty.PadLeft(Dificulty, '0');
+            var leadingZeros = new string('0', Dificulty);
 
             MixHash = CalculateMixHash();
 
@@ -81,7 +102,10 @@ namespace KHN.Cons.Entities
             stringBuilder.Append($"|");
             stringBuilder.Append($"{nameof(BlockNumber)}:{BlockNumber}");
             stringBuilder.Append($"|");
-            stringBuilder.Append($"{nameof(Transaction)}:{Transaction}");
+
+            var transactionsString = Utility.ConvertObjectToJson(Transactions);
+            stringBuilder.Append($"|");
+            stringBuilder.Append($"{nameof(Transaction)}:{transactionsString}");
 
             var text = stringBuilder.ToString();
 

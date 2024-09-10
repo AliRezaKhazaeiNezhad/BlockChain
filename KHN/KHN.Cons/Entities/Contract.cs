@@ -1,4 +1,5 @@
-﻿using System.Security;
+﻿
+using KHN.Cons.Infrastructure;
 
 namespace KHN.Cons.Entities
 {
@@ -6,9 +7,9 @@ namespace KHN.Cons.Entities
     {
         public Contract(int initialDificulty = 0)
         {
-
             _blocks = new List<Block>();
-            CurrentDificulty = initialDificulty;    
+            CurrentDificulty = initialDificulty;
+            _pendingTransactions = new List<Transaction>();
         }
 
         public int CurrentDificulty { get; set; }
@@ -23,10 +24,42 @@ namespace KHN.Cons.Entities
             }
         }
 
+        private List<Transaction> _pendingTransactions;
+
+        public IReadOnlyList<Transaction> PendingTransactions
+        {
+            get
+            {
+                return _pendingTransactions;
+            }
+        }
+
 
 
         public void AddTransactionAndMineBlock(Transaction transaction)
         {
+            switch (transaction.Type)
+            {
+                case TransactionType.Withdrawing:
+                case TransactionType.Transfering:
+
+                    int senderBalance = GetAccountBalance(transaction.SenderAddress);
+
+                    if (senderBalance < transaction.Amout)
+                    {
+                        return;
+                    }
+
+                    break;
+            }
+
+            _pendingTransactions.Add(transaction);
+
+        }
+
+        private Block GetNewBlock()
+        {
+
             Block? parentBlock = null;
             int blockNumber = Blocks.Count;
 
@@ -35,11 +68,30 @@ namespace KHN.Cons.Entities
                 parentBlock = Blocks[blockNumber - 1];
             }
 
-            var newBlock = new Block(blockNumber, transaction, parentBlock?.MixHash, CurrentDificulty);
-            newBlock.Mine();
+            var newBlock = new Block(blockNumber, CurrentDificulty, parentBlock?.MixHash);
 
-            _blocks.Add(newBlock);
+            return newBlock;
         }
+
+
+        public Block? Mine()
+        {
+            var block = GetNewBlock();
+
+            foreach (Transaction transaction in PendingTransactions)
+            {
+                block.AddTransaction(transaction);
+            }
+
+            _pendingTransactions = new List<Transaction>();
+
+            block.Mine();
+
+            _blocks.Add(block);
+
+            return block;   
+        }
+
 
         public bool IsValid()
         {
@@ -74,20 +126,36 @@ namespace KHN.Cons.Entities
 
             int balance = 0;
 
-            foreach (var block in Blocks)
+            foreach (var block in _blocks)
             {
-                if (block.Transaction.ReceptionAddress == accountAddress)
+                foreach (var transaction in block.Transactions)
                 {
-                    balance += block.Transaction.Amout;
-                }
+                    if (transaction.ReceptionAddress == accountAddress)
+                    {
+                        balance += transaction.Amout;
+                    }
 
-                if (block.Transaction.SenderAddress == accountAddress)
+                    if (transaction.SenderAddress == accountAddress)
+                    {
+                        balance -= transaction.Amout;
+                    }
+                }
+            }
+
+            foreach (var transaction in _pendingTransactions)
+            {
+                if (transaction.SenderAddress == accountAddress)
                 {
-                    balance -= block.Transaction.Amout;
+                    balance -= transaction.Amout;
                 }
             }
 
             return balance;
+        }
+
+        public override string ToString()
+        {
+            return Utility.ConvertObjectToJson(this);
         }
     }
 }
