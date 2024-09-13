@@ -5,17 +5,22 @@ namespace KHN.Cons.Entities
 {
     public class Contract : BaseEntity
     {
-        public Contract(int initialDificulty = 0)
+        public Contract(
+            int initialDificulty = 0,
+            double currentMiningReward = 0,
+            double currentMinimumTransactionFee = 0)
         {
             _blocks = new List<Block>();
             CurrentDificulty = initialDificulty;
             _pendingTransactions = new List<Transaction>();
+            CurrentMiningReward = currentMiningReward;
+            CurrentMinimumTransactionFee = currentMinimumTransactionFee;
         }
 
         public int CurrentDificulty { get; set; }
-
+        public double CurrentMiningReward { get; set; }
+        public double CurrentMinimumTransactionFee { get; set; }
         private readonly List<Block> _blocks;
-
         public IReadOnlyList<Block> Blocks
         {
             get
@@ -23,9 +28,7 @@ namespace KHN.Cons.Entities
                 return _blocks.AsReadOnly();
             }
         }
-
         private List<Transaction> _pendingTransactions;
-
         public IReadOnlyList<Transaction> PendingTransactions
         {
             get
@@ -36,18 +39,25 @@ namespace KHN.Cons.Entities
 
 
 
-        public void AddTransactionAndMineBlock(Transaction transaction)
+
+
+        public bool AddTransaction(Transaction transaction)
         {
+            if (transaction.Fee < CurrentMinimumTransactionFee)
+            {
+                return false;
+            }
+
             switch (transaction.Type)
             {
                 case TransactionType.Withdrawing:
                 case TransactionType.Transfering:
 
-                    int senderBalance = GetAccountBalance(transaction.SenderAddress);
+                    double senderBalance = GetAccountBalance(transaction.SenderAddress);
 
                     if (senderBalance < transaction.Amout)
                     {
-                        return;
+                        return false;
                     }
 
                     break;
@@ -55,11 +65,11 @@ namespace KHN.Cons.Entities
 
             _pendingTransactions.Add(transaction);
 
+            return true;
         }
 
         private Block GetNewBlock()
         {
-
             Block? parentBlock = null;
             int blockNumber = Blocks.Count;
 
@@ -74,20 +84,35 @@ namespace KHN.Cons.Entities
         }
 
 
-        public Block? Mine()
+        public Block Mine(string accountAddress)
         {
             var block = GetNewBlock();
+
+            double totalTransactionFee = 0;
 
             foreach (Transaction transaction in PendingTransactions)
             {
                 block.AddTransaction(transaction);
+                totalTransactionFee += transaction.Fee; 
             }
 
-            _pendingTransactions = new List<Transaction>();
+            double totalAmountForMiner = CurrentMiningReward + totalTransactionFee;
+
+            var minerTransaction = new Transaction(
+                TransactionType.Minig,
+                0,
+                totalAmountForMiner,
+                null,
+                accountAddress
+                );
+
+            block.AddTransaction(minerTransaction);
 
             block.Mine();
 
-            _blocks.Add(block);
+            _blocks.Add(block); 
+
+            _pendingTransactions = new List<Transaction>();
 
             return block;   
         }
@@ -117,14 +142,14 @@ namespace KHN.Cons.Entities
         }
 
 
-        public int GetAccountBalance(string accountAddress)
+        public double GetAccountBalance(string accountAddress)
         {
             if (IsValid() == false)
             {
                 return 0;
             }
 
-            int balance = 0;
+            double balance = 0;
 
             foreach (var block in _blocks)
             {

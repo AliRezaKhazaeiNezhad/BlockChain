@@ -4,11 +4,13 @@
     {
         public Transaction(
             TransactionType type,
-            int count,
+            double fee = 0,
+            double amount = 0,
             string? senderAddress = null,
             string? receptionAddress = null)
         {
-            Amout = count;
+            Fee = fee;
+            Amout = amount;
             SenderAddress = senderAddress;
             ReceptionAddress = receptionAddress;
             switch (type)
@@ -54,7 +56,8 @@
         public string? ReceptionAddress { get; }
         public TransactionType Type { get; }
 
-        public int Amout { get; set; }
+        public double Amout { get; set; }
+        public double Fee { get; set; }
         public DateTime Timestamp { get; set; }
     }
 }
